@@ -183,5 +183,18 @@ const oh=V.home;V.home=()=>oh().replace('<div class=g>','<div class=g>'+card('�
 $('#ci').addEventListener('keydown',e=>{if(e.key=='Enter')A.csend()});
 cmsg(`¡Hola ${esc(S.pro.name||'')}! Soy tu asistente. Pregúntame por tus tareas o pídeme recordatorios. Escribe <b>ayuda</b> para ver ejemplos.`);
 S.rem.filter(r=>r.fired&&!r.done).forEach(banner);chk();setInterval(chk,15000);
-go();
+/* ---- sincronización en la nube (Neon vía /api/state) ---- */
+const SK='mcsync';let SY=null;try{SY=localStorage.getItem(SK)}catch(e){}
+const api=(m,b)=>fetch('/api/state',{method:m,headers:{'x-agenda-key':SY,'content-type':'application/json'},body:b?JSON.stringify(b):undefined});
+const smsg=t=>{const e=$('#T');e.textContent=t;e.classList.add('s');setTimeout(()=>{e.classList.remove('s');e.textContent='Guardado ✓'},1800)};
+const _sv=save;let ptm;save=function(){S.ts=Date.now();_sv();if(SY){clearTimeout(ptm);ptm=setTimeout(push,1500)}};
+async function push(){try{const r=await api('PUT',S);smsg(r.ok?'Sincronizado ☁️':'Error al sincronizar')}catch(e){smsg('Sin conexión: guardado solo aquí')}}
+function unlink(){SY=null;try{localStorage.removeItem(SK)}catch(e){}}
+async function pull(first){try{const r=await api('GET');if(r.status==401){smsg('Clave incorrecta');unlink();go();return}if(!r.ok)throw 0;const d=(await r.json()).data;
+if(d&&d.ev){if(first&&!confirm('Ya hay datos guardados en la nube. ¿Cargarlos en este dispositivo y reemplazar los actuales?')){unlink();go();return}
+if(first||(d.ts||0)>(S.ts||0)){S=d;S.rem=S.rem||[];_sv();go();smsg('Datos cargados ☁️');return}}await push()}catch(e){smsg('Sin conexión: guardado solo aquí')}}
+Object.assign(A,{sync(){const k=$('#sk').value.trim();if(!k)return;SY=k;try{localStorage.setItem(SK,k)}catch(e){}pull(true)},unsync(){unlink();go()}});
+const opro=V.pro;V.pro=()=>opro()+card('☁️ Sincronización entre dispositivos',SY?'<p>✅ Conectado. Tus datos se guardan en la nube y se comparten entre móvil y ordenador.</p><button data-a=unsync>Desconectar este dispositivo</button>':'<small>Introduce tu clave de acceso para guardar los datos en la nube (Neon). Hazlo en cada dispositivo.</small><input id=sk type=password placeholder="Clave de acceso" style="width:100%;margin:8px 0"><button class=pri data-a=sync>Conectar</button>');
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&SY)pull(false)});
+go();if(SY)pull(false);
 </script></body></html>
